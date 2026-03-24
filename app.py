@@ -7,10 +7,17 @@ import dash
 from dash import dcc, html, callback, Input, Output
 import plotly.graph_objects as go
 import plotly.express as px
-import pandas as pd
 import json
 from datetime import datetime, timedelta
 import os
+
+# Импортируем pandas только если нужен
+try:
+    import pandas as pd
+    HAS_PANDAS = True
+except ImportError:
+    HAS_PANDAS = False
+    pd = None
 
 # Инициализируем Dash приложение
 app = dash.Dash(__name__)
@@ -340,22 +347,30 @@ def update_daily_revenue(tab):
     
     if wb_data and 'daily_data' in wb_data and wb_data['daily_data']:
         # Используем реальные данные
-        daily = pd.DataFrame(wb_data['daily_data'])
-        daily['date'] = pd.to_datetime(daily['date'])
-        daily = daily.sort_values('date')
+        if HAS_PANDAS:
+            daily = pd.DataFrame(wb_data['daily_data'])
+            daily['date'] = pd.to_datetime(daily['date'])
+            daily = daily.sort_values('date')
+            dates = daily['date'].tolist()
+            revenues = daily['revenue'].tolist()
+        else:
+            dates = [d['date'] for d in wb_data['daily_data']]
+            revenues = [d['revenue'] for d in wb_data['daily_data']]
         
         fig = go.Figure()
         fig.add_trace(go.Scatter(
-            x=daily['date'], y=daily['revenue'],
+            x=dates, y=revenues,
             mode='lines+markers',
             name='Выручка',
             line=dict(color='#667eea', width=3),
             fill='tozeroy',
-            hovertemplate='<b>%{x|%d.%m}</b><br>Выручка: %{y:,.0f}₽<extra></extra>',
+            hovertemplate='<b>%{x}</b><br>Выручка: %{y:,.0f}₽<extra></extra>',
         ))
     else:
         # Тестовые данные если нет реальных
-        dates = pd.date_range(start='2026-02-20', periods=30, freq='D')
+        from datetime import timedelta as td
+        start = datetime(2026, 2, 20)
+        dates = [start + td(days=i) for i in range(30)]
         revenues = [55000 + i*2000 + (i%7)*5000 for i in range(30)]
         
         fig = go.Figure()
